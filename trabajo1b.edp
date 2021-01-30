@@ -1,0 +1,105 @@
+
+real beta = -pi/6;  // mallado realizado por Pascual
+
+real h1 = 1;
+real h2 = 1;
+real h3 = 1;
+real l1 = 4;
+real l2 = 2;
+real l3 = 2;
+real l4 = 3;
+real l5 = 2.5;
+
+border i1(t = 0, 1) {x = l1 * t; y = 0; label = 1;}; // lado inferior inferior izquierda
+border i2(t = 0, 1) {x = l1 + l2 * t;y = h1 * t; label = 1;};  // lado inferior inferior 
+border i3(t = 0, 1) {x = l1 + l2 + l3 * t;y = h1; label = 1;}; // lado inferior inferior 
+border i4(t = 0, 1) {x = l1 + l2 + l3 + l4 * t; y = h1 + l4 * tan(beta) * t; label = 1;}; //lado inferior inferior 
+
+border i6(t = 0, 1) {x = l1+l2+l3+l4 *(1-t); y = h1+h2-l4 * tan(beta)*(1 - t);label = 1;};
+border i7(t = 0, 1) {x = l1 + l2 + l3 * (1 - t); y = h1 + h2;label = 1;};
+border i8(t = 0, 1) {x = l1 + l2 * (1 - t);y = h1 + h2 + h3 * t;label = 1;};
+border i9(t = 0, 1) {x = l1 * (1 -t); y = h1 + h2 + h3;label = 1;};
+
+border i5(t = 0, 1) {x = l1+l2+l3+l4; y=h1+l4 * tan(beta) + (h2-2*l4*tan(beta))*t; label = 3;};  // Salida
+										// 3 - 2
+border i10(t = 0, 1) {x = 0; y = h1 + h2 + h3 * (1 - t);label = 5;} // Entrada
+border i15(t = 0, 1) {x = 0;y = h1 * (1 - t);label =6;}; // Entrada
+								     // 1 - 0
+
+border i11(t = 0, 1) {x = l5 * t; y = h1 + h2;label = 4;};
+border i12(t = 0, 1) {x = l5 + h2 / 2 * t;y = h1 + h2 * (1 - t / 2);label = 4;};
+border i13(t = 0, 1) {x = l5 + h2 / 2 * (1 - t);y = h1 - h2 / 2 * (t -1);label = 4;};
+border i14 (t = 0, 1) {x = l5 * (1 - t);y = h1;label = 4;};
+
+
+int n = 10;
+mesh malla = buildmesh(i1(n) + i2(n) + i3(2*n) + i4(2*n) + i5(300) + i6(2*n)
+	+ i7(2*n) + i8(n) + i9(2*n) + i10(n) + i11(n) + i12(n) + i13(n) 
+	+ i14(n) + i15(n));
+
+plot(malla,wait=1);
+
+fespace Vh(malla,P1);
+
+real nu = 0.00001516, dt = 0.01; 
+
+Vh w,u, v =0, p = 0, q=0;
+
+real area= int2d(malla)(1.);
+
+real tmax=70;  // time end simulation
+real t;  
+int iter;
+iter=0;
+
+real PI=3.1416;
+
+for(t=0;t<tmax;t+=dt) {
+Vh uold = u, vold = v, pold=p;
+Vh f=convect([u,v],-dt,uold), g=convect([u,v],-dt,vold);
+
+iter=iter+1;
+
+// CALCULA LA COMPONENTE u del vector velocidad
+solve pb4u(u,w,init=n,solver=LU)   
+=int2d(malla)(u*w/dt +nu*(dx(u)*dx(w)+dy(u)*dy(w)))
+-int2d(malla)((f/dt-dx(p))*w)
+
++ on(5,u = 8*(y-2)*(3-y)) + on(6,u = 16*(y-0)*(1-y)) + on(1,4,u = 0) + on (3,u=f );
+
+// CALCULA LA COMPONENTE v del vector velocidad
+solve pb4v(v,w,init=n,solver=LU)  
+= int2d(malla)(v*w/dt +nu*(dx(v)*dx(w)+dy(v)*dy(w)))
+-int2d(malla)((g/dt-dy(p))*w)
+
++on(1,4,5,6, v = 0);
+
+real meandiv = int2d(malla)(dx(u)+dy(v))/area;
+
+ // CALCULA la presion
+solve pb4p(q,w,init=n,solver=LU)= int2d(malla)(dx(q)*dx(w)+dy(q)*dy(w))
+- int2d(malla)((dx(u)+ dy(v)-meandiv)*w/dt)+ on(3,q=0);
+real meanpq = int2d(malla)(pold - q)/area;
+
+p = pold-q-meanpq;  	// presion
+u = u + dx(q)*dt;   	// u componente en ejex del vector velocidad
+v = v + dy(q)*dt;  	// v componente en ejex del vector velocidad
+
+if ( !(iter % 5)) 
+plot([u,v],cmm=" tiempo ="+t,value=1);
+
+x=8;   
+y=1.5;
+Vh u1,u2;
+u1=u(x,y);
+u2=v(x,y);
+
+cout << " u = " <<u1<<endl;
+cout << " v = " <<u2<<endl;
+cout << " t = " <<t<<endl;
+cout << " n = " <<n<<endl;
+cout << " dt = " <<dt<<endl;
+
+}
+// plot(malla,ps="mallado.png");
+// plot(malla,ps="mallado.eps");
